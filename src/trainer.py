@@ -81,11 +81,11 @@ class Trainer():
 
             if mn == 'Vgg16':
                 self.net = Vgg16()
-            elif mn == 'Vgg16_bn':
+            elif mn == 'Vgg16-bn':
                 self.net = Vgg16_bn()
             elif mn == 'Vgg19':
                 self.net = Vgg19()
-            elif mn == 'Vgg19_bn':
+            elif mn == 'Vgg19-bn':
                 self.net = Vgg19_bn()
             elif mn == 'Resnet18':
                 self.net = Resnet18()
@@ -99,9 +99,9 @@ class Trainer():
                 self.net = Densenet()
             elif mn == 'Inception':
                 self.net = Inception()
-            elif mn == 'Mobilenet_large':
+            elif mn == 'Mobilenet-large':
                 self.net = Mobilenet_large()
-            elif mn == 'Mobilenet_small':
+            elif mn == 'Mobilenet-small':
                 self.net = Mobilenet_small()
             
             self.net = self.net.to(device)
@@ -118,6 +118,7 @@ class Trainer():
             self.dataset = load_dataloader(self.c['bs'])
             kf = KFold(n_splits=5,shuffle=True,random_state=0)
             epoch_n = 1
+
 
             for learning_index,valid_index in kf.split(self.dataset['train']):
                 #データセットが切り替わるたびに、ネットワークの重み,バイアスを初期化
@@ -222,7 +223,7 @@ class Trainer():
         #訓練後、モデルをセーブする。
         #(実行回数)_(モデル名)_(学習epoch).pth で保存。
         try : 
-             model_name = self.search['model_name'][0]
+             model_name = self.search['model_name']
              n_ep = self.search['n_epoch'][-1]
              n_ex = 0
              with open(os.path.join(config.LOG_DIR_PATH,'experiment.csv'),'r') as f:

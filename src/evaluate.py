@@ -64,11 +64,11 @@ class Evaluater():
 
         if mn == 'Vgg16':
              self.net = Vgg16()
-        elif mn == 'Vgg16_bn':
+        elif mn == 'Vgg16-bn':
             self.net = Vgg16_bn()
         elif mn == 'Vgg19':
             self.net = Vgg19()
-        elif mn == 'Vgg19_bn':
+        elif mn == 'Vgg19-bn':
             self.net = Vgg19_bn()
         elif mn == 'Resnet18':
             self.net = Resnet18()
@@ -82,9 +82,9 @@ class Evaluater():
             self.net = Densenet()
         elif mn == 'Inception':
             self.net = Inception()
-        elif mn == 'Mobilenet_large':
+        elif mn == 'Mobilenet-large':
             self.net = Mobilenet_large()
-        elif mn == 'Mobilenet_small':
+        elif mn == 'Mobilenet-small':
             self.net = Mobilenet_small()
 
         self.net = self.net.to(device)
