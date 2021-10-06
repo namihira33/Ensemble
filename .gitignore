@@ -156,6 +156,9 @@ model/
 command/
 run/
 
+#Notebook
+*.ipynb
+
 
 #tensorboard
 runs/

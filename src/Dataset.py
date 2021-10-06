@@ -12,6 +12,7 @@ class NuclearCataractDatasetBase(Dataset):
     def __init__(self, root, image_list_file, transform=None):
         image_names = []
         labels = []
+        self.image_list_file = image_list_file
 
         with open(image_list_file, "r") as f:
             for line in f:
@@ -29,10 +30,7 @@ class NuclearCataractDatasetBase(Dataset):
         self.image_names = np.array(image_names)
         self.labels = np.array(labels)
         self.transform = transform
-        '''self.label_names = ['Nondisease',
-                            'Mild',
-                            'Moderateness',
-                            'Severe'] '''
+
 
     def __getitem__(self, index):
         image_name = self.image_names[index]
@@ -40,7 +38,7 @@ class NuclearCataractDatasetBase(Dataset):
         label = self.labels[index]
         if self.transform is not None:
             image = self.transform(image)
-        return image,torch.Tensor([label])
+        return (image,torch.Tensor([label])) if self.image_list_file==config.train_info_list else (image,torch.Tensor([label]),image_name)
 
     def __len__(self):
         return len(self.image_names)
@@ -48,17 +46,6 @@ class NuclearCataractDatasetBase(Dataset):
 
     def get_label(self, label_base):
         pass
-
-'''
-class NuclearCataractDatasetBinary(NuclearCataractDatasetBase):
-    def get_label(self, label_base):
-        if sum([int(i) for i in label_base]) != 0:
-            # with disease
-            return [1]
-        else:
-            # without disease
-            return [0]
-            '''
         
 
 class NuclearCataractDataset(NuclearCataractDatasetBase):

@@ -1,6 +1,8 @@
 import torchvision.models as models
 import torch.nn as nn
+import torch
 
+device = torch.device('cuda:0')
 
 class Vgg16(nn.Module):
     def __init__(self):
@@ -121,3 +123,31 @@ class Mobilenet_small(nn.Module):
 
     def forward(self,x):
         return self.net(x)
+
+def make_model(mn):
+    if mn == 'Vgg16':
+        net = Vgg16()
+    elif mn == 'Vgg16-bn':
+        net = Vgg16_bn()
+    elif mn == 'Vgg19':
+        net = Vgg19()
+    elif mn == 'Vgg19-bn':
+        net = Vgg19_bn()
+    elif mn == 'Resnet18':
+        net = Resnet18()
+    elif mn == 'Resnet34':
+        net = Resnet34()
+    elif mn == 'Resnet50':
+        net = Resnet50()
+    elif mn == 'Squeezenet':
+        net = Squeezenet()
+    elif mn == 'Densenet':
+        net = Densenet()
+    elif mn == 'Inception':
+        net = Inception()
+    elif mn == 'Mobilenet-large':
+        net = Mobilenet_large()
+    elif mn == 'Mobilenet-small':
+        net = Mobilenet_small()
+            
+    return net
