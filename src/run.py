@@ -2,9 +2,11 @@ from trainer import Trainer
 import sys
 
 c = {
-    'model_name': 'Resnet18','n_epoch': list(range(45,46)),
+    'model_name': 'Resnet18','n_epoch': list(range(1,2)),
     'seed': [0], 'bs': [8,16,32,64,128], 'lr': [1.3e-5]
 }
+
+#[8,16,32,64,128]
 
 args = len(sys.argv)
 if args >= 2:

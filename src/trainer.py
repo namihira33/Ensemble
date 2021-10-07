@@ -227,8 +227,11 @@ class Trainer():
             xtick = list(map(lambda x:5*x-4,list(range(1,len(validheat[0])+1))))
             xtick = [str(x) + 'ep' for x in xtick]
             sns.heatmap(validheat,annot=True,cmap='Blues',fmt='.2f',
-                xticklabels=range(1,len(validheat[0])+1),yticklabels=heat_index,
-                cbar_kws = dict(label='Age MAE')))
+                xticklabels=xtick,yticklabels=heat_index,
+                cbar_kws = dict(label='Valid Age MAE'))
+            ax.set_ylabel('batch size')
+            ax.set_xlabel('num of epoch')
+            ax.set_title('learning rate : ' + str(self.c['lr']))
             fig.savefig('./log/images/'+self.now + 'train_ep.png')
 
 

@@ -22,6 +22,9 @@ from PIL import Image
 
 import matplotlib.pyplot as plt
 import matplotlib
+import pytab as pt
+
+import inspect
 
 c = {
     'model_name': 'Resnet18',
@@ -161,13 +164,37 @@ class Evaluater():
             ax.set_xlabel('Predict Age')
             ax.set_ylabel('Answer Age')
             fig_path = self.n_ex+'_'+self.c['model_name']+'_'+self.c['n_epoch']+'ep_regression.png'
-            print(fig_path)
-            print(os.path.join(config.LOG_DIR_PATH,'images',fig_path))
+            #print(os.path.join(config.LOG_DIR_PATH,'images',fig_path))
+            fig.savefig(os.path.join(config.LOG_DIR_PATH,'images',fig_path))
+
+            if kappa == 0 :
+                data = {
+                    'Accuracy' : [accuracy],
+                    'R2-score' : [r_score],
+                    'Age MAE' : [mae]
+                }
+            else:
+                data = {
+                    'Accuracy' : [accuracy],
+                    'R2-score' : [r_score],
+                    'kappa' : [kappa],
+                    'Age MAE' : [mae]
+                }
+
+            for k in data:
+                data[k] = ['{:.2f}'.format(d) for d in data[k]]
+
+            tb = pt.table(data=data,th_type='dark')
+            fig = tb.figure
+            fig.suptitle('Score')
+            fig.set_figheight(2)
+            fig.set_figwidth(6)
+            fig_path = self.n_ex+'_'+self.c['model_name']+'_'+self.c['n_epoch']+'ep_scoretable.png'
             fig.savefig(os.path.join(config.LOG_DIR_PATH,'images',fig_path))
 
 
             fig,ax = plt.subplots()
-            ax.bar(['Acc','R-score','kappa'],[accuracy,r_score,kappa],width=0.4,tick_label=['Accuracy','R-Score','kappa'],align='center')
+            ax.bar(['Accuracy','R-score','kappa'],[accuracy,r_score,kappa],width=0.4,tick_label=['Accuracy','R-Score','kappa'],align='center')
             ax.set_title('評価値1')
             ax.set_ylabel('Score')
             ax.set_ylim(0.0,1.0)
