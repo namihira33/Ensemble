@@ -2,8 +2,8 @@ from trainer import Trainer
 import sys
 
 c = {
-    'model_name': 'Resnet18','n_epoch': list(range(21,22)),
-    'seed': [0], 'bs': 64, 'lr': [1.25e-5,9e-6]
+    'model_name': 'Resnet18','n_epoch': list(range(45,46)),
+    'seed': [0], 'bs': [8,16,32,64,128], 'lr': [1.3e-5]
 }
 
 args = len(sys.argv)

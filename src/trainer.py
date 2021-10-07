@@ -27,6 +27,7 @@ from Dataset import load_dataloader
 
 import csv
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 #import pandas as pd
 
@@ -109,8 +110,11 @@ class Trainer():
                 #utils.py -> init_weights()
                 self.net.apply(init_weights)
                 self.optimizer = optim.SGD(params=self.net.parameters(),lr=self.c['lr'],momentum=0.9)
-                    
-                learning_dataset = Subset(self.dataset['train'],learning_index)
+
+                index = np.array(list(learning_index) + list(valid_index))
+
+
+                learning_dataset = Subset(self.dataset['train'],learning_index) if not self.c['evaluate'] else Subset(self.dataset['train'],index)
                 self.dataloaders['learning'] = DataLoader(learning_dataset,self.c['bs'],
                 shuffle=True,num_workers=os.cpu_count())
                 if not self.c['evaluate']:
@@ -205,11 +209,7 @@ class Trainer():
                         self.r_score[phase] = 0
                     print(memory['valid'])
                     validheat.append(memory['valid'])
-                    heat_index.append(self.c['lr'])
-
-
-
-
+                    heat_index.append(self.c['bs'])
 
 
         #パラメータiter後の処理。
@@ -220,23 +220,16 @@ class Trainer():
                 writer.writerow(['-'*20 + 'bestparameters' + '-'*20])
                 writer.writerow(['model_name','lr','seed','n_epoch','auc'])
                 writer.writerow(best_prms[0:10])
-        #学習率・10epoch経過後のヒートマップの描画
-        validheat = [l[::10] for l in validheat[:]]
-        fig,ax = plt.subplots()
-        plt.imshow(validheat,interpolation='nearest',cmap='jet',alpha=0.5) # aspectで縦横比を調整
-
-        # グラフ内に値を書き込む
-        ys, xs = np.meshgrid(range(validheat.shape[0]),range(validheat.shape[1]),indexing='ij')
-        for (x,y,val) in zip(xs.flatten(), ys.flatten(), validheat.flatten()):
-            plt.text(x,y,'{0:.2f}'.format(val), horizontalalignment='center',verticalalignment='center',)
-
-        # 軸ラベルを設定   
-        names = [] # 内包表記
-        plt.xticks(xs[0,:], heat_index)
-        plt.yticks(ys[:,0], range(1,len(validheat[0],10)))
-
-        plt.colorbar()
-        fig.savefig('./log/images/'+self.now + 'train_ep.png')
+            #学習率・10epoch経過後のヒートマップの描画
+            validheat = [l[::5] for l in validheat[:]]
+            print(validheat)
+            fig,ax = plt.subplots()
+            xtick = list(map(lambda x:5*x-4,list(range(1,len(validheat[0])+1))))
+            xtick = [str(x) + 'ep' for x in xtick]
+            sns.heatmap(validheat,annot=True,cmap='Blues',fmt='.2f',
+                xticklabels=range(1,len(validheat[0])+1),yticklabels=heat_index,
+                cbar_kws = dict(label='Age MAE')))
+            fig.savefig('./log/images/'+self.now + 'train_ep.png')
 
 
         elapsed_time = time.time() - start

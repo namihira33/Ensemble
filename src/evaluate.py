@@ -21,6 +21,7 @@ from Dataset import load_dataloader
 from PIL import Image
 
 import matplotlib.pyplot as plt
+import matplotlib
 
 c = {
     'model_name': 'Resnet18',
@@ -29,6 +30,9 @@ c = {
 
 torch.backends.cudnn.benchmark = True
 device = torch.device('cuda:0')
+
+#グラフ内で日本語を使用可能にする。
+matplotlib.rcParams['font.family'] = 'Noto Sans CJK JP'
 
 def sigmoid(x):
     return 1/(1+np.exp(-x))
@@ -146,20 +150,40 @@ class Evaluater():
             print('SE',mse*len(preds))
             print('kappa',kappa)
 
+            fig,ax = plt.subplots()
             lr = LinearRegression()
             lr.fit(preds,labels)
-            plt.scatter(preds,labels)
-            plt.plot(preds,lr.predict(preds),color='red')
+            ax.scatter(preds,labels)
+            ax.plot(preds,lr.predict(preds),color='red',label='Linear Regression')
+            ax.set_title('予測-答え散布図')
+            ax.title.set_size(20)
+            ax.legend()
+            ax.set_xlabel('Predict Age')
+            ax.set_ylabel('Answer Age')
             fig_path = self.n_ex+'_'+self.c['model_name']+'_'+self.c['n_epoch']+'ep_regression.png'
             print(fig_path)
             print(os.path.join(config.LOG_DIR_PATH,'images',fig_path))
-            plt.savefig(os.path.join(config.LOG_DIR_PATH,'images',fig_path))
+            fig.savefig(os.path.join(config.LOG_DIR_PATH,'images',fig_path))
 
 
             fig,ax = plt.subplots()
-            ax.bar(['Acc','Mae','R-score','kappa'],[accuracy,mae,r_score,kappa],width=0.4,tick_label=['Accuracy','Mae','R-Score','kappa'],align='center')
+            ax.bar(['Acc','R-score','kappa'],[accuracy,r_score,kappa],width=0.4,tick_label=['Accuracy','R-Score','kappa'],align='center')
+            ax.set_title('評価値1')
+            ax.set_ylabel('Score')
+            ax.set_ylim(0.0,1.0)
+            ax.title.set_size(20)
             ax.grid(True)
-            fig_path = self.n_ex+'_'+self.c['model_name']+'_'+self.c['n_epoch']+'ep_graph.png'
+            fig_path = self.n_ex+'_'+self.c['model_name']+'_'+self.c['n_epoch']+'ep_graph1.png'
+            fig.savefig(os.path.join(config.LOG_DIR_PATH,'images',fig_path))
+
+            fig,ax = plt.subplots()
+            ax.bar(['MAE'],[mae],width=0.4,tick_label=['MAE'],align='center')
+            ax.set_title('評価値2')
+            ax.set_ylabel('Age')
+            ax.set_xlim(-1,1)
+            ax.title.set_size(20)
+            ax.grid(True)
+            fig_path = self.n_ex+'_'+self.c['model_name']+'_'+self.c['n_epoch']+'ep_graph2.png'
             fig.savefig(os.path.join(config.LOG_DIR_PATH,'images',fig_path))
 
 
