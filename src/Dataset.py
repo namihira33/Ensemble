@@ -5,7 +5,7 @@ import config
 from PIL import Image
 import os
 import numpy as np
-from utils import isint
+from utils import *
 
 
 class NuclearCataractDatasetBase(Dataset):
@@ -17,10 +17,10 @@ class NuclearCataractDatasetBase(Dataset):
         with open(image_list_file, "r") as f:
             for line in f:
                 items = line.split(',')
-                if isint(items[2]):
-                    label = self.get_label(int(items[2]))
+                if isint(items[1]):
+                    label = self.get_label(int(items[1]))
                     
-                    image_name = items[1]
+                    image_name = items[0]
                     image_name = os.path.join(root,image_name)
                     image_names.append(image_name)
                     labels.append(label[0])
@@ -51,6 +51,61 @@ class NuclearCataractDatasetBase(Dataset):
 class NuclearCataractDataset(NuclearCataractDatasetBase):
     def get_label(self, label_base):
         return [label_base]
+
+#まずはn=2の場合で実装
+class EnsembleDataset(Dataset):
+    def __init__(self,*model_files):
+
+        n_models = len(model_files)
+        model_preds = [[] for x in range(n_models)]
+        labels = []
+
+        for i in range(n_models):
+            labels = []
+            with open(model_files[i],'r') as f:
+                for line in f:
+                    items = line.split(',')
+                    #今の所使うのは検証データだけ
+                    if isinstance(items[0],float) and isint(items[1]):
+                        model_preds[i].append(items[0])
+                        labels.append(int(items[1]))
+
+        self.model_preds = np.array(model_preds)
+        self.labels = np.array(labels)
+
+
+    def __getitem__(self, index):
+        f_pd,s_pd = self.model_preds[0][index],self.model_preds[0][index]
+        label = self.labels[index]
+        if self.transform is not None:
+            image = self.transform(image)
+        return (torch.Tensor([f_pd,s_pd]),torch.Tensor([label])[0]))
+
+    def __len__(self):
+        return len(self.labels)
+        #return 1000
+
+    def get_label(self, label_base):
+        pass
+
+def load_ensebledata(batch_size):
+    dataset = {}
+    dataset['train'] = \
+        EnsembleDataset('first_model.csv','second_model.csv')
+    dataset['test'] = \
+        EnsembleDataset('first_model.csv','second_model.csv')
+    
+    dataloader = {}
+    dataloader['train'] = \
+        torch.utils.data.DataLoader(dataset['train'],
+                                    batch_size=batch_size,
+                                    num_workers=os.cpu_count())
+    dataloader['test'] = \
+        torch.utils.data.DataLoader(dataset['test'],
+                                    batch_size=batch_size,
+                                    num_workers=os.cpu_count())
+    return dataloader
+
 
 def load_dataloader(batch_size):
     train_transform = \

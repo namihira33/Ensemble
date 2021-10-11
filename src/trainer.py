@@ -67,6 +67,10 @@ class Trainer():
         #ヒートマップ描画用のリスト
         validheat,heat_index = [],[]
 
+        #Valid予測値出力用のリスト
+        ensemble_list = []
+        test_preds = []
+
         #CSVファイルヘッダー記述
         with open(self.log_path + "/log.csv",'a') as f:
             writer = csv.writer(f)
@@ -116,23 +120,23 @@ class Trainer():
 
                 learning_dataset = Subset(self.dataset['train'],learning_index) if not self.c['evaluate'] else Subset(self.dataset['train'],index)
                 self.dataloaders['learning'] = DataLoader(learning_dataset,self.c['bs'],
-                shuffle=True,num_workers=os.cpu_count())
+                shuffle=False,num_workers=os.cpu_count())
                 if not self.c['evaluate']:
                     valid_dataset = Subset(self.dataset['train'],valid_index)
                     self.dataloaders['valid'] = DataLoader(valid_dataset,self.c['bs'],
-                    shuffle=True,num_workers=os.cpu_count())
+                    shuffle=False,num_workers=os.cpu_count())
 
                 self.tb_writer = tbx.SummaryWriter()
                 for epoch in range(1, self.c['n_epoch']+1):
 
-                    learningmae,learningloss,learningr_score \
+                    learningmae,learningloss,learningr_score\
                         = self.execute_epoch(epoch, 'learning')
                     self.tb_writer.add_scalar('Loss/{}'.format('learning'),learningloss,epoch)
                     self.tb_writer.add_scalar('Mae/{}'.format('learning'),learningmae,epoch)
                     self.tb_writer.add_scalar('R2_score/{}'.format('learning'),learningr_score,epoch)
 
                     if not self.c['evaluate']:
-                        validmae,validloss,validr_score\
+                        validmae,validloss,validr_score,valid_preds,valid_labels\
                             = self.execute_epoch(epoch, 'valid')
                         self.tb_writer.add_scalar('Loss/{}'.format('valid'),validloss,epoch)
                         self.tb_writer.add_scalar('Mae/{}'.format('valid'),validmae,epoch)
@@ -140,7 +144,8 @@ class Trainer():
                         memory['valid'][a].append(validmae)
                         memory2['valid'][a].append(validloss)
 
-                        #validaucを蓄えておいてあとでベスト10を出力
+
+                        #validmaeを蓄えておいてあとでベスト10を出力
                         temp = validmae,epoch,self.c
                         self.prms.append(temp)
 
@@ -154,6 +159,12 @@ class Trainer():
                             self.mae['valid'] += validmae
                             self.loss['valid'] += validloss
                             self.r_score['valid'] += validr_score
+                        valid_preds = np.mean(valid_preds,axis=1)
+                        valid_labels = np.mean(valid_labels,axis=1)
+                        for a,b,c in zip(valid_index,valid_preds,valid_labels):
+                            ensemble_list.append((a,b,c))
+                    
+
                         
                 
                 #n_epoch後の処理
@@ -162,6 +173,45 @@ class Trainer():
                 #JSON形式でTensorboardに保存した値を残しておく。
                 self.tb_writer.export_scalars_to_json('./log/all_scalars.json')
                 self.tb_writer.close()
+
+                #各分割での学習モデルを使って、テストデータに対する予測を出す。
+                self.dataset = load_dataloader(self.c['bs'])
+                test_dataset = self.dataset['test']
+                self.dataloaders['test'] = DataLoader(test_dataset,self.c['bs'],
+                    shuffle=False,num_workers=os.cpu_count())
+
+                preds, labels,paths,total_loss,accuracy= [],[],[],0,0
+                right,notright = 0,0
+                self.net.eval()
+
+                for inputs_, labels_,paths_ in tqdm(self.dataloaders['test']):
+                    inputs_ = inputs_.to(device)
+                    labels_ = labels_.to(device)
+
+                    torch.set_grad_enabled(False)
+                    outputs_ = self.net(inputs_)
+                    loss = self.criterion(outputs_, labels_)
+                    #total_loss += loss.item()
+
+
+                    preds += [outputs_.detach().cpu().numpy()]
+                    labels += [labels_.detach().cpu().numpy()]
+                    paths  += paths_
+
+                    total_loss += float(loss.detach().cpu().numpy()) * len(inputs_)
+
+                preds = np.concatenate(preds)
+                labels = np.concatenate(labels)
+
+
+                test_preds.append(np.mean(preds,axis=1))
+
+#                for path,l,pd in zip(paths,labels,preds):
+#                    print(path,l[0],pd[0])
+ 
+
+
+
                 #CVパラメーターでこんとろーるできるようにする。
                 if not self.c['cv']:
                     break
@@ -220,6 +270,10 @@ class Trainer():
                 writer.writerow(['-'*20 + 'bestparameters' + '-'*20])
                 writer.writerow(['model_name','lr','seed','n_epoch','auc'])
                 writer.writerow(best_prms[0:10])
+            ensemble_list = sorted(ensemble_list,key=lambda x:x[0])
+            #print(ensemble_list[0:10])
+            #print(np.mean(test_preds,axis=0)[:10])
+
             #学習率・10epoch経過後のヒートマップの描画
             validheat = [l[::5] for l in validheat[:]]
             print(validheat)
@@ -237,11 +291,45 @@ class Trainer():
 
         elapsed_time = time.time() - start
         print(f"実行時間 : {elapsed_time:.01f}")
+        #データ取得後、今回のモデルの情報を保存する。
+        try : 
+             model_name = self.search['model_name']
+             n_ep = self.search['n_epoch']
+             n_ex = 0
+             with open(os.path.join(config.LOG_DIR_PATH,'ensemble.csv'),'r') as f:
+                 n_ex = len(f.readlines())
+
+             with open(os.path.join(config.LOG_DIR_PATH,'ensemble.csv'),'a') as f:
+                 writer = csv.writer(f)
+                 writer.writerow([self.now,n_ex,model_name,n_ep,'regression'])
+
+             save_path = '{:0=2}'.format(n_ex)+ '_' + model_name + '_' + '{:0=3}'.format(n_ep)+'ep.pth'
+             model_save_path = os.path.join(config.MODEL_DIR_PATH,save_path)
+             torch.save(self.net.module.state_dict(),model_save_path)
+        except FileNotFoundError:
+            with open(os.path.join(config.LOG_DIR_PATH,'ensemble.csv'),'w') as f:
+                 writer = csv.writer(f)
+                 writer.writerow(['Time','n_ex','Model_name','n_ep','Type'])
+
+
+        #モデルの情報に基づいて、今回のValidでの予測値・テストデータに対する予測値を保存する。
+        with open(os.path.join(config.LOG_DIR_PATH,'first_model.csv'),'w') as f:
+            writer = csv.writer(f)
+            writer.writerow(['-----Model Predict Value------'])
+            for p,pd,l in ensemble_list:
+                writer.writerow([pd,l])
+            test_preds = np.mean(test_preds,axis=0)
+            for t_pd in test_preds:
+                writer.writerow([t_pd])
+
+
+
+
         #訓練後、モデルをセーブする。
         #(実行回数)_(モデル名)_(学習epoch).pth で保存。
         try : 
              model_name = self.search['model_name']
-             n_ep = self.search['n_epoch'][-1]
+             n_ep = self.search['n_epoch']
              n_ex = 0
              with open(os.path.join(config.LOG_DIR_PATH,'experiment.csv'),'r') as f:
                  n_ex = len(f.readlines())
@@ -308,7 +396,7 @@ class Trainer():
             writer.writerow(result_list)
 
 
-        return mae,total_loss,r_score
+        return (mae,total_loss,r_score) if (phase=='learning') else (mae,total_loss,r_score,preds,labels)
 
 def tbx_write(tbw,epoch,phase,mae):
     tbw.add_scalar('Mean_Mae/{}'.format(phase),mae,epoch)
