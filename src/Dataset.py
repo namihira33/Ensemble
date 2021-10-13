@@ -62,24 +62,24 @@ class EnsembleDataset(Dataset):
 
         for i in range(n_models):
             labels = []
-            with open(model_files[i],'r') as f:
+            model_file = os.path.join(config.LOG_DIR_PATH,model_files[i])
+            print(model_file)
+            with open(model_file,'r') as f:
                 for line in f:
-                    items = line.split(',')
+                    items = line.strip().split(',')
                     #今の所使うのは検証データだけ
-                    if isinstance(items[0],float) and isint(items[1]):
-                        model_preds[i].append(items[0])
-                        labels.append(int(items[1]))
+                    if isfloat(items[0]) and len(items)>1:
+                        model_preds[i].append(float(items[0]))
+                        labels.append(int(float(items[1])))
 
         self.model_preds = np.array(model_preds)
         self.labels = np.array(labels)
 
 
     def __getitem__(self, index):
-        f_pd,s_pd = self.model_preds[0][index],self.model_preds[0][index]
+        f_pd,s_pd = self.model_preds[0][index],self.model_preds[1][index]
         label = self.labels[index]
-        if self.transform is not None:
-            image = self.transform(image)
-        return (torch.Tensor([f_pd,s_pd]),torch.Tensor([label])[0]))
+        return (torch.Tensor([f_pd,s_pd]),torch.Tensor([label]))
 
     def __len__(self):
         return len(self.labels)
@@ -88,13 +88,17 @@ class EnsembleDataset(Dataset):
     def get_label(self, label_base):
         pass
 
-def load_ensebledata(batch_size):
+def load_ensembledata(batch_size):
     dataset = {}
     dataset['train'] = \
         EnsembleDataset('first_model.csv','second_model.csv')
     dataset['test'] = \
         EnsembleDataset('first_model.csv','second_model.csv')
+
+    return dataset
     
+    '''
+    CV実装のため、データセット飲みの実装
     dataloader = {}
     dataloader['train'] = \
         torch.utils.data.DataLoader(dataset['train'],
@@ -105,6 +109,7 @@ def load_ensebledata(batch_size):
                                     batch_size=batch_size,
                                     num_workers=os.cpu_count())
     return dataloader
+    '''
 
 
 def load_dataloader(batch_size):

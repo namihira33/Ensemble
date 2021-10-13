@@ -1,4 +1,5 @@
 import torchvision.models as models
+import torch.nn.functional as F
 import torch.nn as nn
 import torch
 
@@ -125,20 +126,18 @@ class Mobilenet_small(nn.Module):
         return self.net(x)
 
 class MLP(nn.Module):
-    def __init__(self):
-        super(MLPNet, self).__init__()
-        self.fc1 = nn.Linear(2, 20)   
-        self.fc2 = nn.Linear(20, 20)
-        self.fc3 = nn.Linear(20, 1)
-        self.dropout1 = nn.Dropout2d(0.2)
-        self.dropout2 = nn.Dropout2d(0.2)
+    def __init__(self,hidden_layer=5):
+        super(MLP, self).__init__()
+        self.fc1 = nn.Linear(2, hidden_layer)   
+        self.fc2 = nn.Linear(hidden_layer, hidden_layer)
+        self.fc3 = nn.Linear(hidden_layer, 1)
+        #self.dropout1 = nn.Dropout2d(0.05)
+        #self.dropout2 = nn.Dropout2d(0.05)
         
     def forward(self, x):
         x = F.relu(self.fc1(x))
-        x = self.dropout1(x)
         x = F.relu(self.fc2(x))
-        x = self.dropout2(x)
-        return F.relu(self.fc3(x))
+        return self.fc3(x)
 
 def make_model(mn):
     if mn == 'Vgg16':

@@ -1,9 +1,12 @@
 from trainer import Trainer
 import sys
+import numpy as np
+
+seeds = list(np.random.choice(10000,1))
 
 c = {
     'model_name': 'Resnet18','n_epoch': 70,
-    'seed': [0], 'bs': [64], 'lr': [1e-5]
+    'seed': seeds, 'bs': [64], 'lr': [1e-5]
 }
 
 args = len(sys.argv)

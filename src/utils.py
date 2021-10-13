@@ -38,6 +38,14 @@ def isint(s):
     else:
         return True
 
+def isfloat(s):
+    try:
+        float(s)
+    except ValueError:
+        return False
+    else:
+        return True
+
 def init_weights(m):
     if isinstance(m,nn.Conv2d) or isinstance(m,nn.Linear):
         nn.init.kaiming_uniform_(m.weight.data,a=math.sqrt(5))

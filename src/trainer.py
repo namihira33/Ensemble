@@ -94,7 +94,7 @@ class Trainer():
                 maes[phase] = []
 
             self.dataset = load_dataloader(self.c['bs'])
-            kf = KFold(n_splits=5,shuffle=True,random_state=0)
+            kf = KFold(n_splits=5,shuffle=True,random_state=self.c['seed'])
             divided_data = kf.split(self.dataset['train'])
 
             memory = {}
@@ -277,11 +277,11 @@ class Trainer():
             #学習率・10epoch経過後のヒートマップの描画
             validheat = [l[::5] for l in validheat[:]]
             print(validheat)
-            fig,ax = plt.subplots()
+            fig,ax = plt.subplots(figsize=(16,8))
             xtick = list(map(lambda x:5*x-4,list(range(1,len(validheat[0])+1))))
             xtick = [str(x) + 'ep' for x in xtick]
-            sns.heatmap(validheat,annot=True,cmap='Blues',fmt='.2f',
-                xticklabels=xtick,yticklabels=heat_index,
+            sns.heatmap(validheat,annot=True,cmap='Set3',fmt='.2f',
+                xticklabels=xtick,yticklabels=heat_index,vmin=2.5,vmax=10
                 cbar_kws = dict(label='Valid Age MAE'))
             ax.set_ylabel('batch size')
             ax.set_xlabel('num of epoch')
