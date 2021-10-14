@@ -67,6 +67,9 @@ class Trainer():
         #ヒートマップ描画用のリスト
         validheat,heat_index = [],[]
 
+        #シード平均を取るためのリスト
+        seed_valid = []
+
         #Valid予測値出力用のリスト
         ensemble_list = []
         test_preds = []
@@ -120,11 +123,11 @@ class Trainer():
 
                 learning_dataset = Subset(self.dataset['train'],learning_index) if not self.c['evaluate'] else Subset(self.dataset['train'],index)
                 self.dataloaders['learning'] = DataLoader(learning_dataset,self.c['bs'],
-                shuffle=False,num_workers=os.cpu_count())
+                shuffle=True,num_workers=os.cpu_count())
                 if not self.c['evaluate']:
                     valid_dataset = Subset(self.dataset['train'],valid_index)
                     self.dataloaders['valid'] = DataLoader(valid_dataset,self.c['bs'],
-                    shuffle=False,num_workers=os.cpu_count())
+                    shuffle=True,num_workers=os.cpu_count())
 
                 self.tb_writer = tbx.SummaryWriter()
                 for epoch in range(1, self.c['n_epoch']+1):
@@ -136,7 +139,7 @@ class Trainer():
                     self.tb_writer.add_scalar('R2_score/{}'.format('learning'),learningr_score,epoch)
 
                     if not self.c['evaluate']:
-                        validmae,validloss,validr_score,valid_preds,valid_labels\
+                        validmae,validloss,validr_score,valid_preds,valid_labels,valid_indexes\
                             = self.execute_epoch(epoch, 'valid')
                         self.tb_writer.add_scalar('Loss/{}'.format('valid'),validloss,epoch)
                         self.tb_writer.add_scalar('Mae/{}'.format('valid'),validmae,epoch)
@@ -161,7 +164,7 @@ class Trainer():
                             self.r_score['valid'] += validr_score
                         valid_preds = np.mean(valid_preds,axis=1)
                         valid_labels = np.mean(valid_labels,axis=1)
-                        for a,b,c in zip(valid_index,valid_preds,valid_labels):
+                        for a,b,c in zip(valid_indexes,valid_preds,valid_labels):
                             ensemble_list.append((a,b,c))
                     
 
@@ -178,13 +181,13 @@ class Trainer():
                 self.dataset = load_dataloader(self.c['bs'])
                 test_dataset = self.dataset['test']
                 self.dataloaders['test'] = DataLoader(test_dataset,self.c['bs'],
-                    shuffle=False,num_workers=os.cpu_count())
+                    shuffle=True,num_workers=os.cpu_count())
 
-                preds, labels,paths,total_loss,accuracy= [],[],[],0,0
+                preds, labels,paths,test_indexes,total_loss,accuracy= [],[],[],[],0,0
                 right,notright = 0,0
                 self.net.eval()
 
-                for inputs_, labels_,paths_ in tqdm(self.dataloaders['test']):
+                for inputs_, labels_,paths_,indexes_ in tqdm(self.dataloaders['test']):
                     inputs_ = inputs_.to(device)
                     labels_ = labels_.to(device)
 
@@ -196,15 +199,17 @@ class Trainer():
 
                     preds += [outputs_.detach().cpu().numpy()]
                     labels += [labels_.detach().cpu().numpy()]
+                    test_indexes += [indexes_.detach().cpu().numpy()]
                     paths  += paths_
-
                     total_loss += float(loss.detach().cpu().numpy()) * len(inputs_)
 
                 preds = np.concatenate(preds)
                 labels = np.concatenate(labels)
+                test_indexes = np.concatenate(test_indexes)
 
-
-                test_preds.append(np.mean(preds,axis=1))
+                for t_id,pd in zip(test_indexes,preds):
+                    test_preds.append((t_id,pd))
+#                   test_preds.append(np.mean(preds,axis=1))
 
 #                for path,l,pd in zip(paths,labels,preds):
 #                    print(path,l[0],pd[0])
@@ -222,6 +227,7 @@ class Trainer():
             if not self.c['evaluate']:
                 memory['valid'] = list(np.mean(memory['valid'],axis=0))
                 memory2['valid'] = list(np.mean(memory2['valid'],axis=0))
+                seed_valid.append(memory['valid'])
 
             if self.c['cv']:
                 self.tb_writer = tbx.SummaryWriter()
@@ -257,9 +263,11 @@ class Trainer():
                         self.mae[phase] = 0
                         self.loss[phase] = 0
                         self.r_score[phase] = 0
+                    seed_valid = np.mean(seed_valid,axis=0)
                     print(memory['valid'])
-                    validheat.append(memory['valid'])
-                    heat_index.append(self.c['bs'])
+                    validheat.append(seed_valid)
+                    heat_index.append(self.c['lr'])
+                    seed_valid = []
 
 
         #パラメータiter後の処理。
@@ -271,6 +279,7 @@ class Trainer():
                 writer.writerow(['model_name','lr','seed','n_epoch','auc'])
                 writer.writerow(best_prms[0:10])
             ensemble_list = sorted(ensemble_list,key=lambda x:x[0])
+            test_preds = sorted(test_preds,key=lambda x:x[0])
             #print(ensemble_list[0:10])
             #print(np.mean(test_preds,axis=0)[:10])
 
@@ -281,11 +290,11 @@ class Trainer():
             xtick = list(map(lambda x:5*x-4,list(range(1,len(validheat[0])+1))))
             xtick = [str(x) + 'ep' for x in xtick]
             sns.heatmap(validheat,annot=True,cmap='Set3',fmt='.2f',
-                xticklabels=xtick,yticklabels=heat_index,vmin=2.5,vmax=10
+                xticklabels=xtick,yticklabels=heat_index,vmin=2.5,vmax=10,
                 cbar_kws = dict(label='Valid Age MAE'))
-            ax.set_ylabel('batch size')
+            ax.set_ylabel('learning rate')
             ax.set_xlabel('num of epoch')
-            ax.set_title('learning rate : ' + str(self.c['lr']))
+            ax.set_title('Batch size : ' + str(self.c['bs']))
             fig.savefig('./log/images/'+self.now + 'train_ep.png')
 
 
@@ -313,13 +322,21 @@ class Trainer():
 
 
         #モデルの情報に基づいて、今回のValidでの予測値・テストデータに対する予測値を保存する。
+        #test_predsをn回ごとに平均を取る。
+        list_t_pd,s = [],0
+        for i,t_pd in enumerate(test_preds):
+            s += t_pd[1]
+            if (i%5==4):
+                s/=5
+                list_t_pd.append(s)
+                s = 0
+        print(list_t_pd)
         with open(os.path.join(config.LOG_DIR_PATH,'first_model.csv'),'w') as f:
             writer = csv.writer(f)
             writer.writerow(['-----Model Predict Value------'])
             for p,pd,l in ensemble_list:
                 writer.writerow([pd,l])
-            test_preds = np.mean(test_preds,axis=0)
-            for t_pd in test_preds:
+            for t_pd in list_t_pd:
                 writer.writerow([t_pd])
 
 
@@ -353,13 +370,13 @@ class Trainer():
 
     #1epochごとの処理
     def execute_epoch(self, epoch, phase):
-        preds, labels,total_loss= [], [],0
+        preds, labels,indexes,total_loss= [], [],[],0
         if phase == 'learning':
             self.net.train()
         else:
             self.net.eval()
 
-        for inputs_, labels_ in tqdm(self.dataloaders[phase]):
+        for inputs_, labels_,indexes_ in tqdm(self.dataloaders[phase]):
             inputs_ = inputs_.to(device)
             labels_ = labels_.to(device)
             self.optimizer.zero_grad()
@@ -376,10 +393,12 @@ class Trainer():
 
             preds += [outputs_.detach().cpu().numpy()]
             labels += [labels_.detach().cpu().numpy()]
+            indexes += [indexes_.detach().cpu().numpy()]
             total_loss += float(loss.detach().cpu().numpy()) * len(inputs_)
 
         preds = np.concatenate(preds)
         labels = np.concatenate(labels)
+        indexes = np.concatenate(indexes)
         mae = mean_absolute_error(labels, preds)
         total_loss /= len(preds)
         r_score = r2_score(labels,preds)
@@ -396,7 +415,7 @@ class Trainer():
             writer.writerow(result_list)
 
 
-        return (mae,total_loss,r_score) if (phase=='learning') else (mae,total_loss,r_score,preds,labels)
+        return (mae,total_loss,r_score) if (phase=='learning') else (mae,total_loss,r_score,preds,labels,indexes)
 
 def tbx_write(tbw,epoch,phase,mae):
     tbw.add_scalar('Mean_Mae/{}'.format(phase),mae,epoch)

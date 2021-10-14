@@ -12,23 +12,26 @@ class NuclearCataractDatasetBase(Dataset):
     def __init__(self, root, image_list_file, transform=None):
         image_names = []
         labels = []
+        indexes = []
         self.image_list_file = image_list_file
 
         with open(image_list_file, "r") as f:
             for line in f:
                 items = line.split(',')
-                if isint(items[1]):
-                    label = self.get_label(int(items[1]))
+                if isint(items[2]):
+                    label = self.get_label(int(items[2]))
                     
-                    image_name = items[0]
+                    image_name = items[1]
                     image_name = os.path.join(root,image_name)
                     image_names.append(image_name)
                     labels.append(label[0])
+                    indexes.append(int(items[0]))
 
 
 
         self.image_names = np.array(image_names)
         self.labels = np.array(labels)
+        self.indexes = np.array(indexes)
         self.transform = transform
 
 
@@ -36,9 +39,10 @@ class NuclearCataractDatasetBase(Dataset):
         image_name = self.image_names[index]
         image = Image.open(image_name).convert('RGB')
         label = self.labels[index]
+        item_index = self.indexes[index]
         if self.transform is not None:
             image = self.transform(image)
-        return (image,torch.Tensor([label])) if self.image_list_file==config.train_info_list else (image,torch.Tensor([label]),image_name)
+        return (image,torch.Tensor([label]),item_index) if self.image_list_file==config.train_info_list else (image,torch.Tensor([label]),image_name,item_index)
 
     def __len__(self):
         return len(self.image_names)
